@@ -39,5 +39,5 @@ TTS_VOLUME        = 1.0            # 0.0 – 1.0
 TTS_VOICE_INDEX   = 0              # 0 = first available voice
 
 # ── Export ───────────────────────────────────────────────────────────────────
-EXPORT_DIR        = "exports"
+# EXPORT_DIR is resolved to <project_root>/exports/ inside utils/image_exporter.py
 EXPORT_PREFIX     = "airsign_canvas"
