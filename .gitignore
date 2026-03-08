@@ -1,0 +1,39 @@
+# --- Python / Entornos Virtuales ---
+.venv/
+venv/
+env/
+bin/
+lib/
+share/
+Include/
+pyvenv.cfg
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Modelos y Datos Pesados (Crucial) ---
+# No queremos subir el modelo de 1.3GB ni la caché de Hugging Face
+.cache/
+models/
+*.safetensors
+*.bin
+*.h5
+*.onnx
+
+# --- Salidas del programa (Exports) ---
+# Evita subir tus capturas de pantalla y el historial de texto personal
+exports/
+*.png
+*.jpg
+*.jpeg
+*.txt
+
+# --- Logs y Configuración Personal ---
+*.log
+.env
+.vscode/
+.idea/
+
+# --- Sistema ---
+.DS_Store
+Thumbs.db
