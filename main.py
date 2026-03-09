@@ -15,6 +15,7 @@ from __future__ import annotations
 import sys
 import time
 import logging
+import multiprocessing
 
 import cv2
 
@@ -26,7 +27,7 @@ from ui.overlay              import Overlay
 from ui.toolbar              import Toolbar
 from ai.ocr_engine           import OCREngine
 from ai.tts_engine           import TTSEngine
-from utils.image_exporter    import save_canvas, append_ocr_result
+from utils.image_exporter    import save_canvas, append_ocr_result, export_canvas
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,12 +58,15 @@ def main() -> None:
     overlay  = Overlay()
     toolbar  = Toolbar()
     ocr      = OCREngine()
-    tts      = TTSEngine(backend="pyttsx3")
+    tts      = TTSEngine()
 
     # Lazy-load OCR/TTS in background (optional – comment out to defer to first use)
     # import threading
     # threading.Thread(target=ocr.load, daemon=True).start()
     # threading.Thread(target=tts.load, daemon=True).start()
+
+    # ── state ─────────────────────────────────────────────────────────────────
+    last_ocr_text: str = ""   # stores last successful OCR result for SPEAK button
 
     # ── toolbar callbacks ─────────────────────────────────────────────────────
     def on_save() -> None:
@@ -74,19 +78,39 @@ def main() -> None:
         overlay.set_status("Canvas cleared", 60)
 
     def on_read() -> None:
+        nonlocal last_ocr_text
         overlay.set_status("Running OCR …", 120)
-        text = ocr.recognise(canvas.canvas_image)
+        img = canvas.canvas_image
+
+        # Always export the raw canvas PNG alongside the TXT log
+        png_name = export_canvas(img)   # returns bare filename (or "")
+
+        text = ocr.recognise(img)
         if text and text != "Could not read text":
-            # Save recognised text to exports/recognized_text.txt
+            last_ocr_text = text
             append_ocr_result(text)
-            overlay.set_status(f"Saved: {text}", 180)
+            status = f"Saved: {text}"
+            if png_name:
+                status += f"  [{png_name}]"
+            overlay.set_status(status, 210)
             tts.speak(text)
         else:
-            overlay.set_status("Could not read text", 120)
+            status = "Could not read text"
+            if png_name:
+                status += f"  [{png_name}]"
+            overlay.set_status(status, 150)
+
+    def on_speak() -> None:
+        if last_ocr_text:
+            overlay.set_status(f"Speaking: {last_ocr_text}", 150)
+            tts.speak(last_ocr_text)
+        else:
+            overlay.set_status("Nothing to speak – run Read first", 90)
 
     toolbar.set_callback("Save",  on_save)
     toolbar.set_callback("Clear", on_clear)
     toolbar.set_callback("Read",  on_read)
+    toolbar.set_callback("Speak", on_speak)
 
     # Build after we know the width
     ret, probe = cap.read()
@@ -166,6 +190,8 @@ def main() -> None:
             on_save()
         elif key == ord("r"):
             on_read()
+        elif key == ord("p"):
+            on_speak()
 
     # ── cleanup ───────────────────────────────────────────────────────────────
     cap.release()
@@ -175,4 +201,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Required on Windows when using multiprocessing with frozen executables
+    multiprocessing.freeze_support()
     main()

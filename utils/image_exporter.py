@@ -35,7 +35,10 @@ def _ensure_export_dir() -> None:
 
 def save_canvas(canvas_bgr: np.ndarray) -> str:
     """
-    Write *canvas_bgr* to a timestamped PNG inside airsign/exports/.
+    Write *canvas_bgr* (raw hand-drawn strokes, black background) to a
+    timestamped PNG inside airsign/exports/.
+
+    Filename format: airsign_canvas_YYYYMMDD_HHMMSS.png
 
     Returns
     -------
@@ -54,6 +57,20 @@ def save_canvas(canvas_bgr: np.ndarray) -> str:
     except Exception as exc:
         logger.error("Failed to save canvas PNG: %s", exc)
         return ""
+
+
+def export_canvas(canvas_bgr: np.ndarray) -> str:
+    """
+    Convenience wrapper — identical to `save_canvas` but returns only the
+    bare filename (e.g. ``airsign_canvas_20250307_210311.png``) so callers
+    can display it in the OpenCV window without a long path string.
+
+    Returns empty string on failure.
+    """
+    abs_path = save_canvas(canvas_bgr)
+    if not abs_path:
+        return ""
+    return os.path.basename(abs_path)
 
 
 def append_ocr_result(text: str) -> str:

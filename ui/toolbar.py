@@ -45,15 +45,17 @@ class Toolbar:
         ("Save",  120, (50, 180, 80)),
         ("Clear", 120, (180, 50, 50)),
         ("Read",  120, (50, 80, 180)),
+        ("Speak", 120, (160, 50, 200)),   # purple/violet
     ]
     _PADDING = 10
 
     def __init__(self) -> None:
         self._buttons: list[Button] = []
         self._callbacks: dict[str, Callable[[], None]] = {
-            "Save": lambda: None,
+            "Save":  lambda: None,
             "Clear": lambda: None,
-            "Read": lambda: None,
+            "Read":  lambda: None,
+            "Speak": lambda: None,
         }
 
     # ── public ───────────────────────────────────────────────────────────────
