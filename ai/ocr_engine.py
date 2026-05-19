@@ -11,14 +11,18 @@ Pre-processing pipeline (required for hand-drawn white-on-black canvas):
   5. Resize to a reasonable height while preserving aspect ratio
 
 Model is lazily loaded on first call to avoid startup overhead.
+Can be pre-loaded in background via load_background().
 """
 
 from __future__ import annotations
 import logging
+import threading
 from typing import Optional
 
 import cv2
 import numpy as np
+import torch
+from pathlib import Path
 
 from config import TROCR_MODEL
 
@@ -33,8 +37,10 @@ class OCREngine:
 
     def __init__(self) -> None:
         self._processor = None
-        self._model     = None
-        self._ready     = False
+        self._model = None
+        self._ready = False
+        self._device = None
+        self._load_lock = threading.Lock()
 
     # ── public ───────────────────────────────────────────────────────────────
 
@@ -42,16 +48,36 @@ class OCREngine:
         """Explicitly load model weights (blocks until done)."""
         if self._ready:
             return
-        try:
-            from transformers import TrOCRProcessor, VisionEncoderDecoderModel
-            logger.info("Loading TrOCR model: %s …", TROCR_MODEL)
-            self._processor = TrOCRProcessor.from_pretrained(TROCR_MODEL)
-            self._model     = VisionEncoderDecoderModel.from_pretrained(TROCR_MODEL)
-            self._ready = True
-            logger.info("TrOCR model ready.")
-        except Exception as exc:
-            logger.error("Failed to load TrOCR model: %s", exc)
-            raise
+        with self._load_lock:
+            if self._ready:
+                return
+            try:
+                from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+                logger.info("Loading TrOCR model: %s …", TROCR_MODEL)
+                self._processor = TrOCRProcessor.from_pretrained(TROCR_MODEL)
+                self._model = VisionEncoderDecoderModel.from_pretrained(TROCR_MODEL)
+                
+                # Detect and set device
+                if torch.cuda.is_available():
+                    self._device = torch.device("cuda")
+                elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+                    self._device = torch.device("mps")
+                else:
+                    self._device = torch.device("cpu")
+                logger.info("Using device: %s", self._device)
+                
+                self._model.to(self._device)
+                self._ready = True
+                logger.info("TrOCR model ready on %s.", self._device)
+            except Exception as exc:
+                logger.error("Failed to load TrOCR model: %s", exc)
+                raise
+
+    def load_background(self) -> None:
+        """Start loading the model in a background daemon thread."""
+        thread = threading.Thread(target=self.load, daemon=True)
+        thread.start()
+        logger.info("Started background loading of TrOCR model")
 
     def recognise(self, canvas_bgr: np.ndarray) -> str:
         """
@@ -66,7 +92,7 @@ class OCREngine:
         str  Recognised text (stripped), or OCR_FALLBACK if nothing useful found.
         """
         if not self._ready:
-            self.load()
+            self.load()  # Blocks until ready (or loads if not started)
 
         # ── debug: log raw canvas stats ──────────────────────────────────────
         nonzero_px = int(np.count_nonzero(cv2.cvtColor(canvas_bgr, cv2.COLOR_BGR2GRAY)))
@@ -86,7 +112,7 @@ class OCREngine:
         try:
             pixel_values = self._processor(
                 images=pil_img, return_tensors="pt"
-            ).pixel_values
+            ).pixel_values.to(self._device)
             generated_ids = self._model.generate(pixel_values)
             text = self._processor.batch_decode(
                 generated_ids, skip_special_tokens=True

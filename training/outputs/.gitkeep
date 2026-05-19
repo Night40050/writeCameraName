@@ -1,0 +1,2 @@
+# This file ensures the outputs directory is tracked by git
+# The actual output files (model weights and plots) will be generated during training

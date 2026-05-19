@@ -17,6 +17,7 @@ from config import (
     BUTTON_TEXT_COLOR,
     FONT_SCALE,
     FONT_THICKNESS,
+    COLOR_PALETTE,
 )
 
 
@@ -48,6 +49,7 @@ class Toolbar:
         ("Speak", 120, (160, 50, 200)),   # purple/violet
     ]
     _PADDING = 10
+    _COLOR_BUTTON_SIZE = 50  # square color buttons
 
     def __init__(self) -> None:
         self._buttons: list[Button] = []
@@ -57,6 +59,9 @@ class Toolbar:
             "Read":  lambda: None,
             "Speak": lambda: None,
         }
+        # Add color callbacks
+        for color_name in COLOR_PALETTE.keys():
+            self._callbacks[color_name] = lambda: None
 
     # ── public ───────────────────────────────────────────────────────────────
 
@@ -67,6 +72,8 @@ class Toolbar:
         """Build button list (call once after frame size is known)."""
         self._buttons = []
         x = self._PADDING
+        
+        # Add main action buttons
         for label, w, color in self._BUTTONS_DEF:
             self._buttons.append(Button(
                 label=label, x=x, width=w,
@@ -74,6 +81,20 @@ class Toolbar:
                 color=color,
             ))
             x += w + self._PADDING
+        
+        # Add separator space
+        x += 20
+        
+        # Add color selection buttons
+        for color_name, color_bgr in COLOR_PALETTE.items():
+            self._buttons.append(Button(
+                label=color_name[0],  # First letter as label (G, B, R, Y, W, O)
+                x=x, 
+                width=self._COLOR_BUTTON_SIZE,
+                callback=self._callbacks.get(color_name, lambda: None),
+                color=color_bgr,
+            ))
+            x += self._COLOR_BUTTON_SIZE + self._PADDING
 
     def render(self, frame: np.ndarray,
                hover_point: Optional[tuple[int, int]] = None) -> np.ndarray:
